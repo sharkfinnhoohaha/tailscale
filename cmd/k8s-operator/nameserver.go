@@ -46,8 +46,6 @@ const (
 
 	messageNameserverCreationFailed  = "Failed creating nameserver resources: %v"
 	messageMultipleDNSConfigsPresent = "Multiple DNSConfig resources found in cluster. Please ensure no more than one is present."
-
-	dnsConfigKey = "dns.json"
 )
 
 // NameserverReconciler knows how to create nameserver resources in cluster in
