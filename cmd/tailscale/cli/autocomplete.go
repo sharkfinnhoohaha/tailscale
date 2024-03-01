@@ -5,23 +5,34 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/peterbourgon/ff/v3"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
-func injectAutocomplete(root *ffcli.Command) {
+func cutDash(s string) (dashes, flag string) {
+	if strings.HasPrefix(s, "-") {
+		if strings.HasPrefix(s[1:], "-") {
+			return "--", s[2:]
+		}
+		return "-", s[1:]
+	}
+	return "", s
+}
+
+func InjectAutocomplete(root *ffcli.Command) {
 	root.Subcommands = append(
 		root.Subcommands,
 		&ffcli.Command{
 			Name:      "__complete",
 			ShortHelp: "HIDDEN: __complete provides autocomplete suggestions to interactive shells.",
 			Exec: func(ctx context.Context, args []string) error {
-				if len(args) < 1 {
-					return nil
+				if len(args) == 0 {
+					args = []string{""}
 				}
-				args, lastArg := args[:len(args)-1], args[len(args)-1]
+				args, completeArg := args[:len(args)-1], args[len(args)-1]
 
 				// Traverse the command-tree to find the parent command whose
 				// subcommand, flags, or arguments are being completed.
@@ -51,39 +62,46 @@ func injectAutocomplete(root *ffcli.Command) {
 				}
 
 				var words []string
+				var dir ShellCompDirective
+
 				switch {
 				// TODO: '-flag arg...' -- Might need to `break walk` above when
 				// args[len(args)-1] is a valid flag which requires an argument
 				// but
-				case strings.HasPrefix(lastArg, "-"):
+				case strings.HasPrefix(completeArg, "-"):
 					// Complete '-flag...'.
-					d := "-"
-					if strings.HasPrefix(lastArg[1:], "-") {
-						d = "--"
-					}
+					dir = ShellCompDirectiveNoFileComp
+					cd, cf := cutDash(completeArg)
 					parent.FlagSet.VisitAll(func(f *flag.Flag) {
+						d := cd
+						if d == "-" && cf == "" && len(f.Name) > 1 {
+							d = "--"
+						}
 						words = append(words, d+f.Name)
 					})
-				default:
+				case len(parent.Subcommands) > 0:
 					// Complete 'sub...'.
+					dir = ShellCompDirectiveNoFileComp
 					for _, sub := range parent.Subcommands {
-						if strings.HasPrefix(sub.Name, lastArg) {
+						if strings.HasPrefix(sub.Name, completeArg) {
 							words = append(words, sub.Name)
 						}
 					}
 				}
 
 				for _, word := range words {
-					if !strings.HasPrefix(word, lastArg) {
+					if !strings.HasPrefix(word, completeArg) {
 						continue
 					}
 					fmt.Println(word)
 				}
+				fmt.Println(":" + strconv.Itoa(int(dir)))
 				return nil
 			},
 		},
 		&ffcli.Command{
-			Name: "completion",
+			Name:      "completion",
+			ShortHelp: "Shell tab-completion scripts.",
 			Subcommands: []*ffcli.Command{
 				{
 					Name: "bash",
@@ -113,7 +131,7 @@ local requestComp lastParam lastChar args
 # Prepare the command to request completions for the program.
 # Calling ${words[0]} instead of directly %[1]s allows handling aliases
 args=("${words[@]:1}")
-requestComp="${words[0]} %[2]s ${args[*]}"
+requestComp="${words[0]} %[2]s -- ${args[*]}"
 
 lastParam=${words[$((${#words[@]}-1))]}
 lastChar=${lastParam:$((${#lastParam}-1)):1}
@@ -483,3 +501,34 @@ const (
 	// This one must be last to avoid messing up the iota count.
 	ShellCompDirectiveDefault ShellCompDirective = 0
 )
+
+// Returns a string listing the different directive enabled in the specified parameter
+func (d ShellCompDirective) String() string {
+	var directives []string
+	if d&ShellCompDirectiveError != 0 {
+		directives = append(directives, "ShellCompDirectiveError")
+	}
+	if d&ShellCompDirectiveNoSpace != 0 {
+		directives = append(directives, "ShellCompDirectiveNoSpace")
+	}
+	if d&ShellCompDirectiveNoFileComp != 0 {
+		directives = append(directives, "ShellCompDirectiveNoFileComp")
+	}
+	if d&ShellCompDirectiveFilterFileExt != 0 {
+		directives = append(directives, "ShellCompDirectiveFilterFileExt")
+	}
+	if d&ShellCompDirectiveFilterDirs != 0 {
+		directives = append(directives, "ShellCompDirectiveFilterDirs")
+	}
+	if d&ShellCompDirectiveKeepOrder != 0 {
+		directives = append(directives, "ShellCompDirectiveKeepOrder")
+	}
+	if len(directives) == 0 {
+		directives = append(directives, "ShellCompDirectiveDefault")
+	}
+
+	if d >= shellCompDirectiveMaxValue {
+		return fmt.Sprintf("ERROR: unexpected ShellCompDirective value: %d", d)
+	}
+	return strings.Join(directives, ", ")
+}

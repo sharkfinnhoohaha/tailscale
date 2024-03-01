@@ -410,6 +410,10 @@ func (v *onConflict) Set(s string) error {
 	return nil
 }
 
+func (v *onConflict) Words() []string {
+	return []string{"skip", "overwrite", "rename"}
+}
+
 var fileGetCmd = &ffcli.Command{
 	Name:       "get",
 	ShortUsage: "file get [--wait] [--verbose] [--conflict=(skip|overwrite|rename)] <target-directory>",
