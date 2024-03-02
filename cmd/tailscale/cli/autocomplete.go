@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -29,6 +31,23 @@ func InjectAutocomplete(root *ffcli.Command) {
 			Name:      "__complete",
 			ShortHelp: "HIDDEN: __complete provides autocomplete suggestions to interactive shells.",
 			Exec: func(ctx context.Context, args []string) error {
+				// Set up debug logging for the rest of this function call.
+				if t := os.Getenv("BASH_COMP_DEBUG_FILE"); t != "" {
+					tf, err := os.OpenFile(t, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+					if err != nil {
+						return fmt.Errorf("opening debug file: %w", err)
+					}
+					defer func(origW io.Writer, origPrefix string, origFlags int) {
+						log.SetOutput(origW)
+						log.SetFlags(origFlags)
+						log.SetPrefix(origPrefix)
+						tf.Close()
+					}(log.Writer(), log.Prefix(), log.Flags())
+					log.SetOutput(tf)
+					log.SetFlags(log.Lshortfile)
+					log.SetPrefix("debug: ")
+				}
+
 				if len(args) == 0 {
 					args = []string{""}
 				}
