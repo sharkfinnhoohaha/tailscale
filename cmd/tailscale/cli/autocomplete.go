@@ -68,19 +68,31 @@ func InjectAutocomplete(root *ffcli.Command) {
 				// TODO: '-flag arg...' -- Might need to `break walk` above when
 				// args[len(args)-1] is a valid flag which requires an argument
 				// but
+
+				// Complete '-flag...'.
 				case strings.HasPrefix(completeArg, "-"):
-					// Complete '-flag...'.
+					used := make(map[string]struct{})
+					parent.FlagSet.Visit(func(f *flag.Flag) {
+						used[f.Name] = struct{}{}
+					})
+
 					dir = ShellCompDirectiveNoFileComp
 					cd, cf := cutDash(completeArg)
 					parent.FlagSet.VisitAll(func(f *flag.Flag) {
+						if _, seen := used[f.Name]; seen {
+							return
+						}
+						// Suggest single-dash '-v' for single-char flags and
+						// double-dash '--verbose' for longer.
 						d := cd
 						if d == "-" && cf == "" && len(f.Name) > 1 {
 							d = "--"
 						}
 						words = append(words, d+f.Name)
 					})
+
+				// Complete 'sub...'.
 				case len(parent.Subcommands) > 0:
-					// Complete 'sub...'.
 					dir = ShellCompDirectiveNoFileComp
 					for _, sub := range parent.Subcommands {
 						if strings.HasPrefix(sub.Name, completeArg) {
@@ -89,6 +101,7 @@ func InjectAutocomplete(root *ffcli.Command) {
 					}
 				}
 
+				// Send back the results to the shell.
 				for _, word := range words {
 					if !strings.HasPrefix(word, completeArg) {
 						continue
@@ -530,5 +543,5 @@ func (d ShellCompDirective) String() string {
 	if d >= shellCompDirectiveMaxValue {
 		return fmt.Sprintf("ERROR: unexpected ShellCompDirective value: %d", d)
 	}
-	return strings.Join(directives, ", ")
+	return strings.Join(directives, " | ")
 }

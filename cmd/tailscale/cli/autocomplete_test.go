@@ -34,7 +34,9 @@ func TestInjectAutocomplete(t *testing.T) {
 		t.Fatalf("failed building testdata/autocomplete_prog.go: %s", err)
 	}
 
-	// Test cases.
+	// Test cases. The shell scripts that we use to hook into the tab completion
+	// invoke "tailscale __complete -- ..." when the user types
+	// "tailscale ...<TAB>", so that should be the start of most args.
 	tests := []struct {
 		args         []string
 		wantComp     []string
@@ -67,14 +69,22 @@ func TestInjectAutocomplete(t *testing.T) {
 			wantComp: []string{"--root-bool", "--root-str"},
 			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
+		{
+			args:     []string{"__complete", "--", "--root-str=s", "--r"},
+			wantComp: []string{"--root-bool"}, // omits --root-str which is already set
+			wantDir:  cli.ShellCompDirectiveNoFileComp,
+		},
+		{
+			args:     []string{"__complete", "--", "--root-str", "--", "--r"},
+			wantComp: []string{"--root-bool"},
+			wantDir:  cli.ShellCompDirectiveNoFileComp,
+		},
 	}
 
 	// Run the tests.
 	for _, test := range tests {
 		test := test
 		t.Run(strings.Join(test.args, "␣"), func(t *testing.T) {
-			t.Parallel()
-
 			// Capture the binary
 			cmd := exec.Command(exe, test.args...)
 			var stdout bytes.Buffer
