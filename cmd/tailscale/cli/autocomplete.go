@@ -32,7 +32,13 @@ func InjectAutocomplete(root *ffcli.Command) {
 				if len(args) == 0 {
 					args = []string{""}
 				}
-				args, completeArg := args[:len(args)-1], args[len(args)-1]
+				completeArg := args[len(args)-1]
+
+				// Replace the argument we're completing with '--' which we'll
+				// check for later. If this '--' remains, there was another
+				// preceding it, telling us that completeArg is not a flag.
+				args[len(args)-1] = "--"
+				var notFlag bool
 
 				// Traverse the command-tree to find the parent command whose
 				// subcommand, flags, or arguments are being completed.
@@ -48,6 +54,9 @@ func InjectAutocomplete(root *ffcli.Command) {
 					}
 
 					args = parent.FlagSet.Args()
+					if len(args) > 0 && args[len(args)-1] == "--" {
+						notFlag = true
+					}
 					if len(args) == 0 {
 						break
 					}
@@ -70,7 +79,7 @@ func InjectAutocomplete(root *ffcli.Command) {
 				// but
 
 				// Complete '-flag...'.
-				case strings.HasPrefix(completeArg, "-"):
+				case !notFlag && strings.HasPrefix(completeArg, "-"):
 					used := make(map[string]struct{})
 					parent.FlagSet.Visit(func(f *flag.Flag) {
 						used[f.Name] = struct{}{}
@@ -79,6 +88,7 @@ func InjectAutocomplete(root *ffcli.Command) {
 					dir = ShellCompDirectiveNoFileComp
 					cd, cf := cutDash(completeArg)
 					parent.FlagSet.VisitAll(func(f *flag.Flag) {
+						// Skip flags already set by the user.
 						if _, seen := used[f.Name]; seen {
 							return
 						}

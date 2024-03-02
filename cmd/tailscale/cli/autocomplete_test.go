@@ -79,6 +79,26 @@ func TestInjectAutocomplete(t *testing.T) {
 			wantComp: []string{"--root-bool"},
 			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
+		{
+			// "--" disables flag parsing, so we shouldn't suggest flags.
+			args:     []string{"__complete", "--", "--", "--root"},
+			wantComp: []string{},
+			wantDir:  cli.ShellCompDirectiveNoFileComp,
+		},
+		{
+			// "--" here is a flag value, so doesn't disable flag parsing.
+			args:     []string{"__complete", "--", "--root-str", "--", "--root"},
+			wantComp: []string{"--root-bool"},
+			wantDir:  cli.ShellCompDirectiveNoFileComp,
+		},
+		{
+			// Equivalent to {"--root-str=--", "--", "--r"} meaning "--r" is not
+			// a flag because it's preceded by a "--" argument:
+			// https://go.dev/play/p/UCtftQqVhOD.
+			args:     []string{"__complete", "--", "--root-str", "--", "--", "--r"},
+			wantComp: []string{},
+			wantDir:  cli.ShellCompDirectiveNoFileComp,
+		},
 	}
 
 	// Run the tests.
