@@ -105,6 +105,16 @@ func TestInjectAutocomplete(t *testing.T) {
 			args:     []string{"__complete", "--", "debug", "--de"},
 			wantComp: []string{"--debug-bool"},
 		},
+		{
+			args:     []string{"__complete", "--", "debug", "--enum="},
+			wantComp: []string{"alpha", "beta", "charlie"},
+			wantDir:  cli.ShellCompDirectiveNoFileComp,
+		},
+		{
+			args:     []string{"__complete", "--", "debug", "--enum=al"},
+			wantComp: []string{"alpha"},
+			wantDir:  cli.ShellCompDirectiveNoFileComp,
+		},
 	}
 
 	// Run the tests.

@@ -123,6 +123,13 @@ func InjectAutocomplete(root *ffcli.Command) {
 										}
 									}
 								}
+							} else if comp := completeFlags[flag]; comp != nil {
+								// Complete custom completions.
+								var err error
+								words, dir, err = comp(completeVal)
+								if err != nil {
+									return fmt.Errorf("completing %s flag %s: %w", parent.Name, flag.Name, err)
+								}
 							}
 						}
 					}
@@ -602,4 +609,31 @@ func (d ShellCompDirective) String() string {
 		return fmt.Sprintf("ERROR: unexpected ShellCompDirective value: %d", d)
 	}
 	return strings.Join(directives, " | ")
+}
+
+type CompleteFunc func(word string) ([]string, ShellCompDirective, error)
+
+var completeFlags map[*flag.Flag]CompleteFunc
+
+func CompleteFlag(fs *flag.FlagSet, name string, comp CompleteFunc) {
+	f := fs.Lookup(name)
+	if f == nil {
+		panic(fmt.Errorf("CompleteFlag: flag %s not found", name))
+	}
+	if completeFlags == nil {
+		completeFlags = make(map[*flag.Flag]CompleteFunc)
+	}
+	completeFlags[f] = comp
+}
+
+func FromWords(dir ShellCompDirective, words ...string) CompleteFunc {
+	return func(prefix string) ([]string, ShellCompDirective, error) {
+		matches := make([]string, 0, len(words))
+		for _, word := range words {
+			if strings.HasPrefix(word, prefix) {
+				matches = append(matches, word)
+			}
+		}
+		return matches, dir, nil
+	}
 }

@@ -36,6 +36,8 @@ func main() {
 				FlagSet: newFlagSet("prog debug", flag.ContinueOnError, func(fs *flag.FlagSet) {
 					fs.String("cpu-profile", "", "write cpu profile to `file`")
 					fs.Bool("debug-bool", false, "debug bool")
+					fs.String("enum", "", "a flag that takes several specific values")
+					cli.CompleteFlag(fs, "enum", cli.FromWords(cli.ShellCompDirectiveNoFileComp, "alpha", "beta", "charlie"))
 				}),
 			},
 		},
