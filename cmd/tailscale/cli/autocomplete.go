@@ -48,35 +48,38 @@ func InjectAutocomplete(root *ffcli.Command) {
 					log.SetPrefix("debug: ")
 				}
 
+				// Send back the results to the shell.
+				var words []string
+				var dir ShellCompDirective
+
+				// Set up the arguments.
 				if len(args) == 0 {
 					args = []string{""}
 				}
 				completeArg := args[len(args)-1]
+				completeFlag := completeArg == "" || strings.HasPrefix(completeArg, "-")
 
 				// Replace the argument we're completing with '--' which we'll
 				// check for later. If this '--' remains, there was another
 				// preceding it, telling us that completeArg is not a flag.
 				args[len(args)-1] = "--"
-				var notFlag bool
 
 				// Traverse the command-tree to find the parent command whose
 				// subcommand, flags, or arguments are being completed.
 				parent := root
 			walk:
 				for {
+					log.Println("walk", parent.Name, args)
 					if parent.FlagSet == nil {
 						parent.FlagSet = flag.NewFlagSet(parent.Name, flag.ContinueOnError)
 					}
 					err := ff.Parse(parent.FlagSet, args, parent.Options...)
 					if err != nil {
-						return fmt.Errorf("parsing %s flags: %w", parent.Name, err)
+						return fmt.Errorf("%s flag parsing: %w", parent.Name, err)
 					}
 
 					args = parent.FlagSet.Args()
-					if len(args) > 0 && args[len(args)-1] == "--" {
-						notFlag = true
-					}
-					if len(args) == 0 {
+					if len(args) == 0 || (len(args) == 1 && args[0] == "--") {
 						break
 					}
 
@@ -88,25 +91,55 @@ func InjectAutocomplete(root *ffcli.Command) {
 						}
 					}
 				}
+				if len(args) > 0 && args[len(args)-1] == "--" {
+					completeFlag = false
+				}
 
-				var words []string
-				var dir ShellCompDirective
-
-				switch {
 				// TODO: '-flag arg...' -- Might need to `break walk` above when
 				// args[len(args)-1] is a valid flag which requires an argument
 				// but
 
+				// Complete '-flag=...'.
+				if completeFlag {
+					if dashFlag, completeVal, ok := strings.Cut(completeArg, "="); ok {
+						// Don't complete '-flag' later on as the
+						// flag name is terminated by a '='.
+						completeFlag = false
+
+						_, flagName := cutDash(dashFlag)
+						flag := parent.FlagSet.Lookup(flagName)
+						if flag != nil {
+							if isBoolFlag(flag) {
+								// Complete true/false.
+							opt:
+								for _, vals := range [][]string{
+									{"true", "TRUE", "True", "1"},
+									{"false", "FALSE", "False", "0"},
+								} {
+									for _, val := range vals {
+										if strings.HasPrefix(val, completeVal) {
+											words = append(words, val)
+											continue opt
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+
 				// Complete '-flag...'.
-				case !notFlag && strings.HasPrefix(completeArg, "-"):
+				if completeFlag {
 					used := make(map[string]struct{})
 					parent.FlagSet.Visit(func(f *flag.Flag) {
 						used[f.Name] = struct{}{}
 					})
 
-					dir = ShellCompDirectiveNoFileComp
 					cd, cf := cutDash(completeArg)
 					parent.FlagSet.VisitAll(func(f *flag.Flag) {
+						if !strings.HasPrefix(f.Name, cf) {
+							return
+						}
 						// Skip flags already set by the user.
 						if _, seen := used[f.Name]; seen {
 							return
@@ -114,15 +147,15 @@ func InjectAutocomplete(root *ffcli.Command) {
 						// Suggest single-dash '-v' for single-char flags and
 						// double-dash '--verbose' for longer.
 						d := cd
-						if d == "-" && cf == "" && len(f.Name) > 1 {
+						if (d == "" || d == "-") && cf == "" && len(f.Name) > 1 {
 							d = "--"
 						}
 						words = append(words, d+f.Name)
 					})
+				}
 
-				// Complete 'sub...'.
-				case len(parent.Subcommands) > 0:
-					dir = ShellCompDirectiveNoFileComp
+				if len(parent.Subcommands) > 0 {
+					// Complete 'sub...'.
 					for _, sub := range parent.Subcommands {
 						if strings.HasPrefix(sub.Name, completeArg) {
 							words = append(words, sub.Name)
@@ -130,11 +163,7 @@ func InjectAutocomplete(root *ffcli.Command) {
 					}
 				}
 
-				// Send back the results to the shell.
 				for _, word := range words {
-					if !strings.HasPrefix(word, completeArg) {
-						continue
-					}
 					fmt.Println(word)
 				}
 				fmt.Println(":" + strconv.Itoa(int(dir)))

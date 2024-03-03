@@ -35,6 +35,7 @@ func main() {
 				Name: "debug",
 				FlagSet: newFlagSet("prog debug", flag.ContinueOnError, func(fs *flag.FlagSet) {
 					fs.String("cpu-profile", "", "write cpu profile to `file`")
+					fs.Bool("debug-bool", false, "debug bool")
 				}),
 			},
 		},

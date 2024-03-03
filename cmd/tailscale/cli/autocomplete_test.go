@@ -47,49 +47,40 @@ func TestInjectAutocomplete(t *testing.T) {
 		{
 			args:     []string{"__complete", "--", "deb"},
 			wantComp: []string{"debug"},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
 		{
 			args:     []string{"__complete", "--", "-"},
 			wantComp: []string{"--root-bool", "--root-str", "-v"},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
 		{
 			args:     []string{"__complete", "--", "--"},
 			wantComp: []string{"--root-bool", "--root-str", "--v"},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
 		{
 			args:     []string{"__complete", "--", "-r"},
 			wantComp: []string{"-root-bool", "-root-str"},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
 		{
 			args:     []string{"__complete", "--", "--r"},
 			wantComp: []string{"--root-bool", "--root-str"},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
 		{
 			args:     []string{"__complete", "--", "--root-str=s", "--r"},
 			wantComp: []string{"--root-bool"}, // omits --root-str which is already set
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
 		{
 			args:     []string{"__complete", "--", "--root-str", "--", "--r"},
 			wantComp: []string{"--root-bool"},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
 		{
 			// "--" disables flag parsing, so we shouldn't suggest flags.
 			args:     []string{"__complete", "--", "--", "--root"},
 			wantComp: []string{},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
 		{
 			// "--" here is a flag value, so doesn't disable flag parsing.
 			args:     []string{"__complete", "--", "--root-str", "--", "--root"},
 			wantComp: []string{"--root-bool"},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
 		},
 		{
 			// Equivalent to {"--root-str=--", "--", "--r"} meaning "--r" is not
@@ -97,7 +88,22 @@ func TestInjectAutocomplete(t *testing.T) {
 			// https://go.dev/play/p/UCtftQqVhOD.
 			args:     []string{"__complete", "--", "--root-str", "--", "--", "--r"},
 			wantComp: []string{},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
+		},
+		{
+			args:     []string{"__complete", "--", "--root-bool="},
+			wantComp: []string{"true", "false"},
+		},
+		{
+			args:     []string{"__complete", "--", "--root-bool=t"},
+			wantComp: []string{"true"},
+		},
+		{
+			args:     []string{"__complete", "--", "--root-bool=T"},
+			wantComp: []string{"TRUE"},
+		},
+		{
+			args:     []string{"__complete", "--", "debug", "--de"},
+			wantComp: []string{"--debug-bool"},
 		},
 	}
 
