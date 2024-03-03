@@ -20,6 +20,7 @@ import (
 
 	"github.com/peterbourgon/ff/v3/ffcli"
 	"tailscale.com/client/tailscale"
+	"tailscale.com/cmd/tailscale/cli/ffauto"
 	"tailscale.com/envknob"
 	"tailscale.com/paths"
 	"tailscale.com/version/distro"
@@ -156,7 +157,7 @@ change in the future.
 		}
 	}
 
-	InjectAutocomplete(rootCmd)
+	ffauto.Inject(rootCmd)
 	if err := rootCmd.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil

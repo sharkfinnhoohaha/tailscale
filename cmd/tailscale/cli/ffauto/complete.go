@@ -1,4 +1,4 @@
-package cli
+package ffauto
 
 import (
 	"context"
@@ -24,7 +24,7 @@ func cutDash(s string) (dashes, flag string) {
 	return "", s
 }
 
-func InjectAutocomplete(root *ffcli.Command) {
+func Inject(root *ffcli.Command) {
 	root.Subcommands = append(
 		root.Subcommands,
 		&ffcli.Command{
@@ -615,7 +615,7 @@ type CompleteFunc func(word string) ([]string, ShellCompDirective, error)
 
 var completeFlags map[*flag.Flag]CompleteFunc
 
-func CompleteFlag(fs *flag.FlagSet, name string, comp CompleteFunc) {
+func Flag(fs *flag.FlagSet, name string, comp CompleteFunc) {
 	f := fs.Lookup(name)
 	if f == nil {
 		panic(fmt.Errorf("CompleteFlag: flag %s not found", name))
@@ -626,7 +626,7 @@ func CompleteFlag(fs *flag.FlagSet, name string, comp CompleteFunc) {
 	completeFlags[f] = comp
 }
 
-func FromWords(dir ShellCompDirective, words ...string) CompleteFunc {
+func Fixed(dir ShellCompDirective, words ...string) CompleteFunc {
 	return func(prefix string) ([]string, ShellCompDirective, error) {
 		matches := make([]string, 0, len(words))
 		for _, word := range words {
@@ -636,4 +636,11 @@ func FromWords(dir ShellCompDirective, words ...string) CompleteFunc {
 		}
 		return matches, dir, nil
 	}
+}
+
+func isBoolFlag(f *flag.Flag) bool {
+	bf, ok := f.Value.(interface {
+		IsBoolFlag() bool
+	})
+	return ok && bf.IsBoolFlag()
 }

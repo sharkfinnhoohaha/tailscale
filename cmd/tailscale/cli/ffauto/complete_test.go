@@ -1,4 +1,4 @@
-package cli_test
+package ffauto_test
 
 import (
 	"bytes"
@@ -12,13 +12,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
-	"tailscale.com/cmd/tailscale/cli"
+	"tailscale.com/cmd/tailscale/cli/ffauto"
 )
 
 // For cache-busting go test.
 //
-//go:embed testdata/autocomplete_prog.go
+//go:embed testdata/complete_prog.go
 var _ string
 
 func TestInjectAutocomplete(t *testing.T) {
@@ -26,12 +25,12 @@ func TestInjectAutocomplete(t *testing.T) {
 
 	// Build our test program in testdata.
 	exe := filepath.Join(t.TempDir(), "autocomplete-prog")
-	build := exec.Command("go", "build", "-o", exe, "./testdata/autocomplete_prog.go")
+	build := exec.Command("go", "build", "-o", exe, "./testdata/complete_prog.go")
 	build.Stdout = os.Stdout
 	build.Stderr = os.Stderr
 	err := build.Run()
 	if err != nil {
-		t.Fatalf("failed building testdata/autocomplete_prog.go: %s", err)
+		t.Fatalf("failed building testdata/complete_prog.go: %s", err)
 	}
 
 	// Test cases. The shell scripts that we use to hook into the tab completion
@@ -40,7 +39,7 @@ func TestInjectAutocomplete(t *testing.T) {
 	tests := []struct {
 		args         []string
 		wantComp     []string
-		wantDir      cli.ShellCompDirective
+		wantDir      ffauto.ShellCompDirective
 		wantInStdout string
 		wantInStderr string
 	}{
@@ -108,12 +107,12 @@ func TestInjectAutocomplete(t *testing.T) {
 		{
 			args:     []string{"__complete", "--", "debug", "--enum="},
 			wantComp: []string{"alpha", "beta", "charlie"},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
+			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
 		},
 		{
 			args:     []string{"__complete", "--", "debug", "--enum=al"},
 			wantComp: []string{"alpha"},
-			wantDir:  cli.ShellCompDirectiveNoFileComp,
+			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
 		},
 	}
 
@@ -152,14 +151,14 @@ func TestInjectAutocomplete(t *testing.T) {
 			}
 
 			// Parse the completion results.
-			var dir cli.ShellCompDirective
+			var dir ffauto.ShellCompDirective
 			complete := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
 			if len(complete) > 0 && strings.HasPrefix(complete[len(complete)-1], ":") {
 				n, err := strconv.Atoi(complete[len(complete)-1][1:])
 				if err != nil {
 					t.Fatalf("failed to parse completion directive: %s", err)
 				}
-				dir = cli.ShellCompDirective(n)
+				dir = ffauto.ShellCompDirective(n)
 				complete = complete[:len(complete)-1]
 			}
 

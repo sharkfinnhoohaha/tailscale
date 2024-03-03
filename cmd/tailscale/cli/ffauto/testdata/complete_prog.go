@@ -11,7 +11,7 @@ import (
 	"os"
 
 	"github.com/peterbourgon/ff/v3/ffcli"
-	"tailscale.com/cmd/tailscale/cli"
+	"tailscale.com/cmd/tailscale/cli/ffauto"
 )
 
 func newFlagSet(name string, errh flag.ErrorHandling, flags func(fs *flag.FlagSet)) *flag.FlagSet {
@@ -37,11 +37,11 @@ func main() {
 					fs.String("cpu-profile", "", "write cpu profile to `file`")
 					fs.Bool("debug-bool", false, "debug bool")
 					fs.String("enum", "", "a flag that takes several specific values")
-					cli.CompleteFlag(fs, "enum", cli.FromWords(cli.ShellCompDirectiveNoFileComp, "alpha", "beta", "charlie"))
+					ffauto.Flag(fs, "enum", ffauto.Fixed(ffauto.ShellCompDirectiveNoFileComp, "alpha", "beta", "charlie"))
 				}),
 			},
 		},
 	}
-	cli.InjectAutocomplete(root)
+	ffauto.Inject(root)
 	root.ParseAndRun(context.Background(), os.Args[1:])
 }
