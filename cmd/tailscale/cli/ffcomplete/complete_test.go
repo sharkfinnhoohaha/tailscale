@@ -1,4 +1,4 @@
-package ffauto_test
+package ffcomplete_test
 
 import (
 	_ "embed"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/peterbourgon/ff/v3/ffcli"
-	"tailscale.com/cmd/tailscale/cli/ffauto"
+	"tailscale.com/cmd/tailscale/cli/ffcomplete"
 )
 
 func newFlagSet(name string, errh flag.ErrorHandling, flags func(fs *flag.FlagSet)) *flag.FlagSet {
@@ -38,12 +38,18 @@ func TestComplete(t *testing.T) {
 					fs.Bool("debug-bool", false, "debug bool")
 					fs.Int("num", 0, "a number")
 					fs.String("enum", "", "a flag that takes several specific values")
-					ffauto.Flag(fs, "enum", ffauto.Fixed(ffauto.ShellCompDirectiveNoFileComp, "alpha", "beta", "charlie"))
+					ffcomplete.Flag(fs, "enum", ffcomplete.Fixed("alpha", "beta", "charlie"))
 				}),
 			},
-			ffauto.Args(
-				&ffcli.Command{Name: "ping"},
-				ffauto.Fixed(ffauto.ShellCompDirectiveNoFileComp, "jupiter", "neptune", "venus"),
+			ffcomplete.Args(
+				&ffcli.Command{
+					Name: "ping",
+					FlagSet: newFlagSet("prog ping", flag.ContinueOnError, func(fs *flag.FlagSet) {
+						fs.String("until", "", "when pinging should end")
+						ffcomplete.Flag(fs, "until", ffcomplete.Fixed("forever", "direct"))
+					}),
+				},
+				ffcomplete.Fixed("jupiter", "neptune", "venus"),
 			),
 		},
 	}
@@ -51,7 +57,7 @@ func TestComplete(t *testing.T) {
 	tests := []struct {
 		args     []string
 		wantComp []string
-		wantDir  ffauto.ShellCompDirective
+		wantDir  ffcomplete.ShellCompDirective
 	}{
 		{
 			args:     []string{"deb"},
@@ -78,22 +84,23 @@ func TestComplete(t *testing.T) {
 			wantComp: []string{"--root-bool"}, // omits --root-str which is already set
 		},
 		{
-			args:     []string{"--root-str", "--", "--r"},
-			wantComp: []string{"--root-bool"},
-		},
-		{
-			// "--" disables flag parsing, so we shouldn't suggest flags.
+			// '--' disables flag parsing, so we shouldn't suggest flags.
 			args:     []string{"--", "--root"},
 			wantComp: nil,
 		},
 		{
-			// "--" here is a flag value, so doesn't disable flag parsing.
+			// '--' is used as the value of '--root-str'.
+			args:     []string{"--root-str", "--", "--r"},
+			wantComp: []string{"--root-bool"},
+		},
+		{
+			// '--' here is a flag value, so doesn't disable flag parsing.
 			args:     []string{"--root-str", "--", "--root"},
 			wantComp: []string{"--root-bool"},
 		},
 		{
-			// Equivalent to {"--root-str=--", "--", "--r"} meaning "--r" is not
-			// a flag because it's preceded by a "--" argument:
+			// Equivalent to '--root-str=-- -- --r' meaning '--r' is not
+			// a flag because it's preceded by a '--' argument:
 			// https://go.dev/play/p/UCtftQqVhOD.
 			args:     []string{"--root-str", "--", "--", "--r"},
 			wantComp: nil,
@@ -117,27 +124,27 @@ func TestComplete(t *testing.T) {
 		{
 			args:     []string{"debug", "--enum="},
 			wantComp: []string{"alpha", "beta", "charlie"},
-			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
+			wantDir:  ffcomplete.ShellCompDirectiveNoFileComp,
 		},
 		{
 			args:     []string{"debug", "--enum=al"},
 			wantComp: []string{"alpha"},
-			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
+			wantDir:  ffcomplete.ShellCompDirectiveNoFileComp,
 		},
 		// {
 		// 	args:     []string{"debug", "--enum", "al"},
 		// 	wantComp: []string{"alpha"},
-		// 	wantDir:  ffauto.ShellCompDirectiveNoFileComp,
+		// 	wantDir:  ffcomplete.ShellCompDirectiveNoFileComp,
 		// },
 		{
 			args:     []string{"ping", ""},
 			wantComp: []string{"jupiter", "neptune", "venus"},
-			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
+			wantDir:  ffcomplete.ShellCompDirectiveNoFileComp,
 		},
 		{
 			args:     []string{"ping", "j"},
 			wantComp: []string{"jupiter"},
-			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
+			wantDir:  ffcomplete.ShellCompDirectiveNoFileComp,
 		},
 	}
 
@@ -146,7 +153,7 @@ func TestComplete(t *testing.T) {
 		test := test
 		t.Run(strings.Join(test.args, "␣"), func(t *testing.T) {
 			// Capture the binary
-			complete, dir, err := ffauto.Complete(root, test.args)
+			complete, dir, err := ffcomplete.Complete(root, test.args)
 			if err != nil {
 				t.Fatalf("completion error: %s", err)
 			}

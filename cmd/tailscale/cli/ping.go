@@ -17,7 +17,7 @@ import (
 
 	"github.com/peterbourgon/ff/v3/ffcli"
 	"tailscale.com/client/tailscale"
-	"tailscale.com/cmd/tailscale/cli/ffauto"
+	"tailscale.com/cmd/tailscale/cli/ffcomplete"
 	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/tailcfg"
 )
@@ -61,7 +61,7 @@ relay node.
 }
 
 func init() {
-	ffauto.Args(pingCmd, func(word string) ([]string, ffauto.ShellCompDirective, error) {
+	ffcomplete.Args(pingCmd, func(word string) ([]string, ffcomplete.ShellCompDirective, error) {
 		st, err := localClient.Status(context.Background())
 		if err != nil {
 			return nil, 0, err
@@ -70,7 +70,7 @@ func init() {
 		for _, node := range st.Peer {
 			nodes = append(nodes, strings.TrimSuffix(node.DNSName, "."))
 		}
-		return nodes, ffauto.ShellCompDirectiveNoFileComp, nil
+		return nodes, ffcomplete.ShellCompDirectiveNoFileComp, nil
 	})
 }
 

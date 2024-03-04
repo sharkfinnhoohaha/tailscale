@@ -15,7 +15,7 @@ import (
 	"github.com/peterbourgon/ff/v3/ffcli"
 	"tailscale.com/client/web"
 	"tailscale.com/clientupdate"
-	"tailscale.com/cmd/tailscale/cli/ffauto"
+	"tailscale.com/cmd/tailscale/cli/ffcomplete"
 	"tailscale.com/ipn"
 	"tailscale.com/net/netutil"
 	"tailscale.com/net/tsaddr"
@@ -79,7 +79,7 @@ func newSetFlagSet(goos string, setArgs *setArgsT) *flag.FlagSet {
 	setf.BoolVar(&setArgs.postureChecking, "posture-checking", false, "HIDDEN: allow management plane to gather device posture information")
 	setf.BoolVar(&setArgs.runWebClient, "webclient", false, "run a web interface for managing this node, served over Tailscale at port 5252")
 
-	ffauto.Flag(setf, "exit-node", func(word string) ([]string, ffauto.ShellCompDirective, error) {
+	ffcomplete.Flag(setf, "exit-node", func(word string) ([]string, ffcomplete.ShellCompDirective, error) {
 		st, err := localClient.Status(context.Background())
 		if err != nil {
 			return nil, 0, err
@@ -91,7 +91,7 @@ func newSetFlagSet(goos string, setArgs *setArgsT) *flag.FlagSet {
 			}
 			nodes = append(nodes, strings.TrimSuffix(node.DNSName, "."))
 		}
-		return nodes, ffauto.ShellCompDirectiveNoFileComp, nil
+		return nodes, ffcomplete.ShellCompDirectiveNoFileComp, nil
 	})
 
 	if safesocket.GOOSUsesPeerCreds(goos) {

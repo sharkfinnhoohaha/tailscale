@@ -1,11 +1,11 @@
-// Package ffauto provides shell tab-completion of subcommands, flags and
+// Package ffcomplete provides shell tab-completion of subcommands, flags and
 // arguments for Go programs written with [ffcli].
 //
 // The shell integration scripts have been extracted from Cobra
 // (https://cobra.dev/), whose authors deserve most of the credit for this work.
 // These shell completion functions invoke `$0 completion __complete -- ...`
 // which is wired up to [Complete].
-package ffauto
+package ffcomplete
 
 import (
 	"context"
@@ -62,7 +62,7 @@ func Inject(root *ffcli.Command, usageFunc func(*ffcli.Command) string) {
 				// Subcommands for generating shell integration scripts.
 				{
 					Name:       "bash",
-					ShortHelp:  "Generate bash shell completion",
+					ShortHelp:  "Generate bash shell completion script.",
 					ShortUsage: ". <( " + root.Name + " completion bash )",
 					UsageFunc:  usageFunc,
 					Exec: func(ctx context.Context, args []string) error {
@@ -125,12 +125,24 @@ func Inject(root *ffcli.Command, usageFunc func(*ffcli.Command) string) {
 //
 // TODO: What's the behaviour if a command's FlagSet contains flag.ExitOnError?
 func Complete(root *ffcli.Command, args []string) (words []string, dir ShellCompDirective, err error) {
+	// Explicitly log panics.
+	defer func() {
+		if r := recover(); r != nil {
+			if rerr, ok := err.(error); ok {
+				err = fmt.Errorf("panic: %w", rerr)
+			} else {
+				err = fmt.Errorf("panic: %v", r)
+			}
+		}
+	}()
+
 	// Set up the arguments.
 	if len(args) == 0 {
 		args = []string{""}
 	}
 	completeArg := args[len(args)-1]
 	completeFlag := completeArg == "" || strings.HasPrefix(completeArg, "-")
+	completeArgs := true
 
 	// Replace the argument we're completing with '--' which we'll
 	// check for later. If this '--' remains, there was another
@@ -178,6 +190,7 @@ walk:
 			// Don't complete '-flag' later on as the
 			// flag name is terminated by a '='.
 			completeFlag = false
+			completeArgs = false
 
 			_, flagName := cutDash(dashFlag)
 			flag := cmd.FlagSet.Lookup(flagName)
@@ -234,21 +247,22 @@ walk:
 	}
 
 	// Complete 'sub...'.
-	for _, sub := range cmd.Subcommands {
-		if strings.HasPrefix(sub.Name, completeArg) {
-			words = append(words, sub.Name)
+	if completeArgs {
+		for _, sub := range cmd.Subcommands {
+			if strings.HasPrefix(sub.Name, completeArg) {
+				words = append(words, sub.Name)
+			}
+		}
+
+		if comp := completeCmds[cmd]; comp != nil {
+			w, d, err := comp(completeArg)
+			if err != nil {
+				return nil, 0, fmt.Errorf("completing %s args: %w", cmd.Name, err)
+			}
+			dir = d
+			words = append(words, w...)
 		}
 	}
-
-	if comp := completeCmds[cmd]; comp != nil {
-		w, d, err := comp(completeArg)
-		if err != nil {
-			return nil, 0, fmt.Errorf("completing %s args: %w", cmd.Name, err)
-		}
-		dir = d
-		words = append(words, w...)
-	}
-
 	return words, dir, nil
 }
 
@@ -299,7 +313,7 @@ func Args(cmd *ffcli.Command, comp CompleteFunc) *ffcli.Command {
 type CompleteFunc func(word string) ([]string, ShellCompDirective, error)
 
 // Fixed returns a CompleteFunc which suggests the given words.
-func Fixed(dir ShellCompDirective, words ...string) CompleteFunc {
+func Fixed(words ...string) CompleteFunc {
 	return func(prefix string) ([]string, ShellCompDirective, error) {
 		matches := make([]string, 0, len(words))
 		for _, word := range words {
@@ -307,14 +321,16 @@ func Fixed(dir ShellCompDirective, words ...string) CompleteFunc {
 				matches = append(matches, word)
 			}
 		}
-		return matches, dir, nil
+		return matches, ShellCompDirectiveNoFileComp, nil
 	}
 }
 
 // FilesWithExtensions returns a CompleteFunc that tells the shell to limit file
 // suggestions to those with the given extensions.
 func FilesWithExtensions(exts ...string) CompleteFunc {
-	return Fixed(ShellCompDirectiveFilterFileExt, exts...)
+	return func(word string) ([]string, ShellCompDirective, error) {
+		return exts, ShellCompDirectiveFilterFileExt, nil
+	}
 }
 
 func isBoolFlag(f *flag.Flag) bool {
