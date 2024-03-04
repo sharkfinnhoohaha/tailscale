@@ -179,8 +179,6 @@ func Inject(root *ffcli.Command, usageFunc func(*ffcli.Command) string) {
 // The returned words do not necessarily need to be prefixed with the last arg
 // which is being completed. For example, '--bool-flag=' will have completions
 // 'true' and 'false'.
-//
-// TODO: What's the behaviour if a command's FlagSet contains flag.ExitOnError?
 func Complete(root *ffcli.Command, args []string) (words []string, dir ShellCompDirective, err error) {
 	// Explicitly log panics.
 	defer func() {
