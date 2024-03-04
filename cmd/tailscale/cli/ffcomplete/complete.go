@@ -28,11 +28,21 @@ import (
 // root.Name needs to match the command that the user is tab-completing for the
 // shell script to work as expected by default.
 func Inject(root *ffcli.Command, usageFunc func(*ffcli.Command) string) {
+	const (
+		compCmd          = "completion __complete --"
+		activeHelpEnvvar = "_activeHelp_" // FIXME what should this be?
+	)
+
+	nameForVar := root.Name
+	nameForVar = strings.ReplaceAll(nameForVar, "-", "_")
+	nameForVar = strings.ReplaceAll(nameForVar, ":", "_")
+
 	root.Subcommands = append(
 		root.Subcommands,
 		&ffcli.Command{
 			Name:      "completion",
 			ShortHelp: "Shell tab-completion scripts.",
+			LongHelp:  fmt.Sprintf(usageTemplate, root.Name),
 
 			// Print help if run without args.
 			Exec: func(ctx context.Context, args []string) error { return flag.ErrHelp },
@@ -68,10 +78,57 @@ func Inject(root *ffcli.Command, usageFunc func(*ffcli.Command) string) {
 					Exec: func(ctx context.Context, args []string) error {
 						_, err := fmt.Fprintf(
 							os.Stdout, bashTemplate,
-							root.Name, "completion __complete --",
+							root.Name, compCmd,
 							ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
 							ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, ShellCompDirectiveKeepOrder,
-							"_activeHelp_",
+							activeHelpEnvvar,
+						)
+						return err
+					},
+				},
+				{
+					Name:       "zsh",
+					ShortHelp:  "Generate zsh shell completion script.",
+					ShortUsage: ". <( " + root.Name + " completion zsh )",
+					UsageFunc:  usageFunc,
+					Exec: func(ctx context.Context, args []string) error {
+						_, err := fmt.Fprintf(
+							os.Stdout, zshTemplate,
+							root.Name, compCmd,
+							ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
+							ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, ShellCompDirectiveKeepOrder,
+							activeHelpEnvvar,
+						)
+						return err
+					},
+				},
+				{
+					Name:       "fish",
+					ShortHelp:  "Generate fish shell completion script.",
+					ShortUsage: root.Name + " completion fish | source",
+					UsageFunc:  usageFunc,
+					Exec: func(ctx context.Context, args []string) error {
+						_, err := fmt.Fprintf(
+							os.Stdout, fishTemplate,
+							nameForVar, root.Name, compCmd,
+							ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
+							ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, ShellCompDirectiveKeepOrder, activeHelpEnvvar,
+						)
+						return err
+					},
+				},
+				{
+					Name:       "powershell",
+					ShortHelp:  "Generate powershell completion script.",
+					ShortUsage: root.Name + " completion powershell | Out-String | Invoke-Expression",
+					UsageFunc:  usageFunc,
+					Exec: func(ctx context.Context, args []string) error {
+						_, err := fmt.Fprintf(
+							os.Stdout, powershellTemplate,
+							root.Name, nameForVar, compCmd,
+							ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
+							ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, ShellCompDirectiveKeepOrder,
+							activeHelpEnvvar,
 						)
 						return err
 					},
