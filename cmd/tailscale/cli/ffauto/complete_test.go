@@ -36,10 +36,15 @@ func TestComplete(t *testing.T) {
 				FlagSet: newFlagSet("prog debug", flag.ContinueOnError, func(fs *flag.FlagSet) {
 					fs.String("cpu-profile", "", "write cpu profile to `file`")
 					fs.Bool("debug-bool", false, "debug bool")
+					fs.Int("num", 0, "a number")
 					fs.String("enum", "", "a flag that takes several specific values")
 					ffauto.Flag(fs, "enum", ffauto.Fixed(ffauto.ShellCompDirectiveNoFileComp, "alpha", "beta", "charlie"))
 				}),
 			},
+			ffauto.Args(
+				&ffcli.Command{Name: "ping"},
+				ffauto.Fixed(ffauto.ShellCompDirectiveNoFileComp, "jupiter", "neptune", "venus"),
+			),
 		},
 	}
 
@@ -117,6 +122,21 @@ func TestComplete(t *testing.T) {
 		{
 			args:     []string{"debug", "--enum=al"},
 			wantComp: []string{"alpha"},
+			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
+		},
+		// {
+		// 	args:     []string{"debug", "--enum", "al"},
+		// 	wantComp: []string{"alpha"},
+		// 	wantDir:  ffauto.ShellCompDirectiveNoFileComp,
+		// },
+		{
+			args:     []string{"ping", ""},
+			wantComp: []string{"jupiter", "neptune", "venus"},
+			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
+		},
+		{
+			args:     []string{"ping", "j"},
+			wantComp: []string{"jupiter"},
 			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
 		},
 	}

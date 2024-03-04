@@ -107,29 +107,29 @@ func Complete(root *ffcli.Command, args []string) (words []string, dir ShellComp
 	// preceding it, telling us that completeArg is not a flag.
 	args[len(args)-1] = "--"
 
-	// Traverse the command-tree to find the parent command whose
+	// Traverse the command-tree to find the cmd command whose
 	// subcommand, flags, or arguments are being completed.
-	parent := root
+	cmd := root
 walk:
 	for {
-		log.Println("walk", parent.Name, args)
-		if parent.FlagSet == nil {
-			parent.FlagSet = flag.NewFlagSet(parent.Name, flag.ContinueOnError)
+		log.Println("walk", cmd.Name, args)
+		if cmd.FlagSet == nil {
+			cmd.FlagSet = flag.NewFlagSet(cmd.Name, flag.ContinueOnError)
 		}
-		err := ff.Parse(parent.FlagSet, args, parent.Options...)
+		err := ff.Parse(cmd.FlagSet, args, cmd.Options...)
 		if err != nil {
-			return nil, 0, fmt.Errorf("%s flag parsing: %w", parent.Name, err)
+			return nil, 0, fmt.Errorf("%s flag parsing: %w", cmd.Name, err)
 		}
 
-		args = parent.FlagSet.Args()
+		args = cmd.FlagSet.Args()
 		if len(args) == 0 || (len(args) == 1 && args[0] == "--") {
 			break
 		}
 
-		for _, sub := range parent.Subcommands {
+		for _, sub := range cmd.Subcommands {
 			if strings.EqualFold(sub.Name, args[0]) {
 				args = args[1:]
-				parent = sub
+				cmd = sub
 				continue walk
 			}
 		}
@@ -151,11 +151,17 @@ walk:
 			completeFlag = false
 
 			_, flagName := cutDash(dashFlag)
-			flag := parent.FlagSet.Lookup(flagName)
+			flag := cmd.FlagSet.Lookup(flagName)
 			if flag != nil {
-				if isBoolFlag(flag) {
+				if comp := completeFlags[flag]; comp != nil {
+					// Complete custom completions.
+					var err error
+					words, dir, err = comp(completeVal)
+					if err != nil {
+						return nil, 0, fmt.Errorf("completing %s flag %s: %w", cmd.Name, flag.Name, err)
+					}
+				} else if isBoolFlag(flag) {
 					// Complete true/false.
-				opt:
 					for _, vals := range [][]string{
 						{"true", "TRUE", "True", "1"},
 						{"false", "FALSE", "False", "0"},
@@ -163,16 +169,9 @@ walk:
 						for _, val := range vals {
 							if strings.HasPrefix(val, completeVal) {
 								words = append(words, val)
-								continue opt
+								break
 							}
 						}
-					}
-				} else if comp := completeFlags[flag]; comp != nil {
-					// Complete custom completions.
-					var err error
-					words, dir, err = comp(completeVal)
-					if err != nil {
-						return nil, 0, fmt.Errorf("completing %s flag %s: %w", parent.Name, flag.Name, err)
 					}
 				}
 			}
@@ -182,12 +181,12 @@ walk:
 	// Complete '-flag...'.
 	if completeFlag {
 		used := make(map[string]struct{})
-		parent.FlagSet.Visit(func(f *flag.Flag) {
+		cmd.FlagSet.Visit(func(f *flag.Flag) {
 			used[f.Name] = struct{}{}
 		})
 
 		cd, cf := cutDash(completeArg)
-		parent.FlagSet.VisitAll(func(f *flag.Flag) {
+		cmd.FlagSet.VisitAll(func(f *flag.Flag) {
 			if !strings.HasPrefix(f.Name, cf) {
 				return
 			}
@@ -205,13 +204,21 @@ walk:
 		})
 	}
 
-	if len(parent.Subcommands) > 0 {
-		// Complete 'sub...'.
-		for _, sub := range parent.Subcommands {
-			if strings.HasPrefix(sub.Name, completeArg) {
-				words = append(words, sub.Name)
-			}
+	// Complete 'sub...'.
+	for _, sub := range cmd.Subcommands {
+		if strings.HasPrefix(sub.Name, completeArg) {
+			words = append(words, sub.Name)
 		}
+	}
+
+	if comp := completeCmds[cmd]; comp != nil {
+		log.Println("custom comp", cmd.Name, comp)
+		w, d, err := comp(completeArg)
+		if err != nil {
+			return nil, 0, fmt.Errorf("completing %s args: %w", cmd.Name, err)
+		}
+		dir = d
+		words = append(words, w...)
 	}
 
 	return words, dir, nil
@@ -246,12 +253,16 @@ func Flag(fs *flag.FlagSet, name string, comp CompleteFunc) {
 
 var completeCmds map[*ffcli.Command]CompleteFunc
 
-// Arg registers a completion function for the args of cmd.
+// Args registers a completion function for the args of cmd.
 //
 // comp will be called to return suggestions when the user tries to tab-complete
 // `prog <TAB>` or `prog subcmd arg1 <TAB>`, for example.
-func Arg(cmd *ffcli.Command, comp CompleteFunc) {
+func Args(cmd *ffcli.Command, comp CompleteFunc) *ffcli.Command {
+	if completeCmds == nil {
+		completeCmds = make(map[*ffcli.Command]CompleteFunc)
+	}
 	completeCmds[cmd] = comp
+	return cmd
 }
 
 // FIXME: taking a single word makes sense for flags, but for args the value
