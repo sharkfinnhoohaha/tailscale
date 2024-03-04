@@ -142,7 +142,6 @@ func Complete(root *ffcli.Command, args []string) (words []string, dir ShellComp
 	cmd := root
 walk:
 	for {
-		log.Println("walk", cmd.Name, args)
 		if cmd.FlagSet == nil {
 			cmd.FlagSet = flag.NewFlagSet(cmd.Name, flag.ContinueOnError)
 		}
@@ -242,7 +241,6 @@ walk:
 	}
 
 	if comp := completeCmds[cmd]; comp != nil {
-		log.Println("custom comp", cmd.Name, comp)
 		w, d, err := comp(completeArg)
 		if err != nil {
 			return nil, 0, fmt.Errorf("completing %s args: %w", cmd.Name, err)
