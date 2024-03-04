@@ -247,7 +247,8 @@ walk:
 		emitFlag = false
 	}
 
-	// Complete '-flag=...'.
+	// Complete '-flag=...'. If the args ended with '-flag ...' we will have
+	// rewritten to '-flag=...' by now.
 	if emitFlag && strings.HasPrefix(completeArg, "-") && strings.Contains(completeArg, "=") {
 		// Don't complete '-flag' later on as the
 		// flag name is terminated by a '='.
@@ -259,9 +260,9 @@ walk:
 		flag := cmd.FlagSet.Lookup(f)
 		if flag != nil {
 			if comp := completeFlags[flag]; comp != nil {
-				// Complete custom completions.
+				// Complete custom flag values.
 				var err error
-				words, dir, err = comp(completeVal)
+				words, dir, err = comp([]string{completeVal})
 				if err != nil {
 					return nil, 0, fmt.Errorf("completing %s flag %s: %w", cmd.Name, flag.Name, err)
 				}
@@ -308,16 +309,17 @@ walk:
 		})
 	}
 
-	// Complete 'sub...'.
 	if emitArgs {
+		// Complete 'sub...'.
 		for _, sub := range cmd.Subcommands {
 			if strings.HasPrefix(sub.Name, completeArg) {
 				words = append(words, sub.Name)
 			}
 		}
 
+		// Complete custom args.
 		if comp := completeCmds[cmd]; comp != nil {
-			w, d, err := comp(completeArg)
+			w, d, err := comp(append(args, completeArg))
 			if err != nil {
 				return nil, 0, fmt.Errorf("completing %s args: %w", cmd.Name, err)
 			}
@@ -394,7 +396,8 @@ func Flag(fs *flag.FlagSet, name string, comp CompleteFunc) {
 
 var completeCmds map[*ffcli.Command]CompleteFunc
 
-// Args registers a completion function for the args of cmd.
+// Args registers a completion function for the args of cmd. cmd is returned
+// unmodified.
 //
 // comp will be called to return suggestions when the user tries to tab-complete
 // `prog <TAB>` or `prog subcmd arg1 <TAB>`, for example.
@@ -409,14 +412,24 @@ func Args(cmd *ffcli.Command, comp CompleteFunc) *ffcli.Command {
 // FIXME: taking a single word makes sense for flags, but for args the value
 // being completed may depend on the preceding arguments, and maybe we should
 // pass those through too...
-type CompleteFunc func(word string) ([]string, ShellCompDirective, error)
+type CompleteFunc func(args []string) ([]string, ShellCompDirective, error)
+
+// LastArg returns the last element of args, or the empty string if args is
+// empty.
+func LastArg(args []string) string {
+	if len(args) == 0 {
+		return ""
+	}
+	return args[len(args)-1]
+}
 
 // Fixed returns a CompleteFunc which suggests the given words.
 func Fixed(words ...string) CompleteFunc {
-	return func(prefix string) ([]string, ShellCompDirective, error) {
+	return func(args []string) ([]string, ShellCompDirective, error) {
+		match := LastArg(args)
 		matches := make([]string, 0, len(words))
 		for _, word := range words {
-			if strings.HasPrefix(word, prefix) {
+			if strings.HasPrefix(word, match) {
 				matches = append(matches, word)
 			}
 		}
@@ -427,7 +440,7 @@ func Fixed(words ...string) CompleteFunc {
 // FilesWithExtensions returns a CompleteFunc that tells the shell to limit file
 // suggestions to those with the given extensions.
 func FilesWithExtensions(exts ...string) CompleteFunc {
-	return func(word string) ([]string, ShellCompDirective, error) {
+	return func(args []string) ([]string, ShellCompDirective, error) {
 		return exts, ShellCompDirectiveFilterFileExt, nil
 	}
 }

@@ -61,7 +61,11 @@ relay node.
 }
 
 func init() {
-	ffcomplete.Args(pingCmd, func(word string) ([]string, ffcomplete.ShellCompDirective, error) {
+	ffcomplete.Args(pingCmd, func(args []string) ([]string, ffcomplete.ShellCompDirective, error) {
+		if len(args) > 1 {
+			return nil, ffcomplete.ShellCompDirectiveNoFileComp, nil
+		}
+
 		st, err := localClient.Status(context.Background())
 		if err != nil {
 			return nil, 0, err
