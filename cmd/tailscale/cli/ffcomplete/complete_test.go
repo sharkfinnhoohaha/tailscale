@@ -33,10 +33,10 @@ func TestComplete(t *testing.T) {
 		Subcommands: []*ffcli.Command{
 			{
 				Name: "debug",
-				FlagSet: newFlagSet("prog debug", flag.ContinueOnError, func(fs *flag.FlagSet) {
+				FlagSet: newFlagSet("prog debug", flag.ExitOnError, func(fs *flag.FlagSet) {
 					fs.String("cpu-profile", "", "write cpu profile to `file`")
 					fs.Bool("debug-bool", false, "debug bool")
-					fs.Int("num", 0, "a number")
+					fs.Int("level", 0, "a number")
 					fs.String("enum", "", "a flag that takes several specific values")
 					ffcomplete.Flag(fs, "enum", ffcomplete.Fixed("alpha", "beta", "charlie"))
 				}),
@@ -131,14 +131,23 @@ func TestComplete(t *testing.T) {
 			wantComp: []string{"alpha"},
 			wantDir:  ffcomplete.ShellCompDirectiveNoFileComp,
 		},
-		// {
-		// 	args:     []string{"debug", "--enum", "al"},
-		// 	wantComp: []string{"alpha"},
-		// 	wantDir:  ffcomplete.ShellCompDirectiveNoFileComp,
-		// },
+		{
+			args:     []string{"debug", "--level", ""},
+			wantComp: nil,
+		},
+		{
+			args:     []string{"debug", "--enum", "b"},
+			wantComp: []string{"beta"},
+			wantDir:  ffcomplete.ShellCompDirectiveNoFileComp,
+		},
+		{
+			args:     []string{"debug", "--enum", "al"},
+			wantComp: []string{"alpha"},
+			wantDir:  ffcomplete.ShellCompDirectiveNoFileComp,
+		},
 		{
 			args:     []string{"ping", ""},
-			wantComp: []string{"jupiter", "neptune", "venus"},
+			wantComp: []string{"--until", "jupiter", "neptune", "venus"},
 			wantDir:  ffcomplete.ShellCompDirectiveNoFileComp,
 		},
 		{
