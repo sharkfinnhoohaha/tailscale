@@ -157,7 +157,7 @@ change in the future.
 		}
 	}
 
-	ffauto.Inject(rootCmd)
+	ffauto.Inject(rootCmd, usageFunc)
 	if err := rootCmd.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil

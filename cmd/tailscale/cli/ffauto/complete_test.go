@@ -1,116 +1,121 @@
 package ffauto_test
 
 import (
-	"bytes"
 	_ "embed"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
+	"flag"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/peterbourgon/ff/v3/ffcli"
 	"tailscale.com/cmd/tailscale/cli/ffauto"
 )
 
-// For cache-busting go test.
-//
-//go:embed testdata/complete_prog.go
-var _ string
+func newFlagSet(name string, errh flag.ErrorHandling, flags func(fs *flag.FlagSet)) *flag.FlagSet {
+	fs := flag.NewFlagSet(name, errh)
+	if flags != nil {
+		flags(fs)
+	}
+	return fs
+}
 
-func TestInjectAutocomplete(t *testing.T) {
+func TestComplete(t *testing.T) {
 	t.Parallel()
 
 	// Build our test program in testdata.
-	exe := filepath.Join(t.TempDir(), "autocomplete-prog")
-	build := exec.Command("go", "build", "-o", exe, "./testdata/complete_prog.go")
-	build.Stdout = os.Stdout
-	build.Stderr = os.Stderr
-	err := build.Run()
-	if err != nil {
-		t.Fatalf("failed building testdata/complete_prog.go: %s", err)
+	root := &ffcli.Command{
+		Name: "prog",
+		FlagSet: newFlagSet("prog", flag.ContinueOnError, func(fs *flag.FlagSet) {
+			fs.Bool("v", false, "verbose")
+			fs.Bool("root-bool", false, "root `bool`")
+			fs.String("root-str", "", "some `text`")
+		}),
+		Subcommands: []*ffcli.Command{
+			{
+				Name: "debug",
+				FlagSet: newFlagSet("prog debug", flag.ContinueOnError, func(fs *flag.FlagSet) {
+					fs.String("cpu-profile", "", "write cpu profile to `file`")
+					fs.Bool("debug-bool", false, "debug bool")
+					fs.String("enum", "", "a flag that takes several specific values")
+					ffauto.Flag(fs, "enum", ffauto.Fixed(ffauto.ShellCompDirectiveNoFileComp, "alpha", "beta", "charlie"))
+				}),
+			},
+		},
 	}
 
-	// Test cases. The shell scripts that we use to hook into the tab completion
-	// invoke "tailscale __complete -- ..." when the user types
-	// "tailscale ...<TAB>", so that should be the start of most args.
 	tests := []struct {
-		args         []string
-		wantComp     []string
-		wantDir      ffauto.ShellCompDirective
-		wantInStdout string
-		wantInStderr string
+		args     []string
+		wantComp []string
+		wantDir  ffauto.ShellCompDirective
 	}{
 		{
-			args:     []string{"__complete", "--", "deb"},
+			args:     []string{"deb"},
 			wantComp: []string{"debug"},
 		},
 		{
-			args:     []string{"__complete", "--", "-"},
+			args:     []string{"-"},
 			wantComp: []string{"--root-bool", "--root-str", "-v"},
 		},
 		{
-			args:     []string{"__complete", "--", "--"},
+			args:     []string{"--"},
 			wantComp: []string{"--root-bool", "--root-str", "--v"},
 		},
 		{
-			args:     []string{"__complete", "--", "-r"},
+			args:     []string{"-r"},
 			wantComp: []string{"-root-bool", "-root-str"},
 		},
 		{
-			args:     []string{"__complete", "--", "--r"},
+			args:     []string{"--r"},
 			wantComp: []string{"--root-bool", "--root-str"},
 		},
 		{
-			args:     []string{"__complete", "--", "--root-str=s", "--r"},
+			args:     []string{"--root-str=s", "--r"},
 			wantComp: []string{"--root-bool"}, // omits --root-str which is already set
 		},
 		{
-			args:     []string{"__complete", "--", "--root-str", "--", "--r"},
+			args:     []string{"--root-str", "--", "--r"},
 			wantComp: []string{"--root-bool"},
 		},
 		{
 			// "--" disables flag parsing, so we shouldn't suggest flags.
-			args:     []string{"__complete", "--", "--", "--root"},
-			wantComp: []string{},
+			args:     []string{"--", "--root"},
+			wantComp: nil,
 		},
 		{
 			// "--" here is a flag value, so doesn't disable flag parsing.
-			args:     []string{"__complete", "--", "--root-str", "--", "--root"},
+			args:     []string{"--root-str", "--", "--root"},
 			wantComp: []string{"--root-bool"},
 		},
 		{
 			// Equivalent to {"--root-str=--", "--", "--r"} meaning "--r" is not
 			// a flag because it's preceded by a "--" argument:
 			// https://go.dev/play/p/UCtftQqVhOD.
-			args:     []string{"__complete", "--", "--root-str", "--", "--", "--r"},
-			wantComp: []string{},
+			args:     []string{"--root-str", "--", "--", "--r"},
+			wantComp: nil,
 		},
 		{
-			args:     []string{"__complete", "--", "--root-bool="},
+			args:     []string{"--root-bool="},
 			wantComp: []string{"true", "false"},
 		},
 		{
-			args:     []string{"__complete", "--", "--root-bool=t"},
+			args:     []string{"--root-bool=t"},
 			wantComp: []string{"true"},
 		},
 		{
-			args:     []string{"__complete", "--", "--root-bool=T"},
+			args:     []string{"--root-bool=T"},
 			wantComp: []string{"TRUE"},
 		},
 		{
-			args:     []string{"__complete", "--", "debug", "--de"},
+			args:     []string{"debug", "--de"},
 			wantComp: []string{"--debug-bool"},
 		},
 		{
-			args:     []string{"__complete", "--", "debug", "--enum="},
+			args:     []string{"debug", "--enum="},
 			wantComp: []string{"alpha", "beta", "charlie"},
 			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
 		},
 		{
-			args:     []string{"__complete", "--", "debug", "--enum=al"},
+			args:     []string{"debug", "--enum=al"},
 			wantComp: []string{"alpha"},
 			wantDir:  ffauto.ShellCompDirectiveNoFileComp,
 		},
@@ -121,45 +126,9 @@ func TestInjectAutocomplete(t *testing.T) {
 		test := test
 		t.Run(strings.Join(test.args, "␣"), func(t *testing.T) {
 			// Capture the binary
-			cmd := exec.Command(exe, test.args...)
-			var stdout bytes.Buffer
-			cmd.Stdout = &stdout
-			var stderr bytes.Buffer
-			cmd.Stderr = &stderr
-
-			// Run it.
-			err := cmd.Run()
-			var debug strings.Builder
-			fmt.Fprintf(&debug, "Run: %s\n", cmd)
-			if stdout.Len() > 0 {
-				fmt.Fprintf(&debug, "Stdout:\n\t%s\n", strings.ReplaceAll(stdout.String(), "\n", "\n\t"))
-			}
-			if stderr.Len() > 0 {
-				fmt.Fprintf(&debug, "Stderr:\n\t%s\n", strings.ReplaceAll(stderr.String(), "\n", "\n\t"))
-			}
-			t.Log(strings.TrimSpace(debug.String()))
+			complete, dir, err := ffauto.Complete(root, test.args)
 			if err != nil {
-				t.Fatalf("run failed: %s", err)
-			}
-
-			// Test the output contained what we expected.
-			if !bytes.Contains(stdout.Bytes(), []byte(test.wantInStdout)) {
-				t.Errorf("stdout did not contain %q", test.wantInStdout)
-			}
-			if !bytes.Contains(stderr.Bytes(), []byte(test.wantInStderr)) {
-				t.Errorf("stderr did not contain %q", test.wantInStderr)
-			}
-
-			// Parse the completion results.
-			var dir ffauto.ShellCompDirective
-			complete := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
-			if len(complete) > 0 && strings.HasPrefix(complete[len(complete)-1], ":") {
-				n, err := strconv.Atoi(complete[len(complete)-1][1:])
-				if err != nil {
-					t.Fatalf("failed to parse completion directive: %s", err)
-				}
-				dir = ffauto.ShellCompDirective(n)
-				complete = complete[:len(complete)-1]
+				t.Fatalf("completion error: %s", err)
 			}
 
 			// Test the results match our expectation.
