@@ -34,9 +34,37 @@ func Inject(root *ffcli.Command, usageFunc func(*ffcli.Command) string) {
 			Name:      "completion",
 			ShortHelp: "Shell tab-completion scripts.",
 
+			// Print help if run without args.
+			Exec: func(ctx context.Context, args []string) error { return flag.ErrHelp },
+
+			// Omit the '__complete' subcommand from the 'completion' help.
+			UsageFunc: func(c *ffcli.Command) string {
+				// Filter the subcommands to omit '__complete'.
+				s := make([]*ffcli.Command, 0, len(c.Subcommands))
+				for _, sub := range c.Subcommands {
+					if !strings.HasPrefix(sub.Name, "__") {
+						s = append(s, sub)
+					}
+				}
+
+				// Swap in the filtered subcommands list for the rest of the call.
+				defer func(r []*ffcli.Command) { c.Subcommands = r }(c.Subcommands)
+				c.Subcommands = s
+
+				// Render the usage.
+				if usageFunc == nil {
+					return ffcli.DefaultUsageFunc(c)
+				}
+				return usageFunc(c)
+			},
+
 			Subcommands: []*ffcli.Command{
+				// Subcommands for generating shell integration scripts.
 				{
-					Name: "bash",
+					Name:       "bash",
+					ShortHelp:  "Generate bash shell completion",
+					ShortUsage: ". <( " + root.Name + " completion bash )",
+					UsageFunc:  usageFunc,
 					Exec: func(ctx context.Context, args []string) error {
 						_, err := fmt.Fprintf(
 							os.Stdout, bashTemplate,
@@ -49,9 +77,11 @@ func Inject(root *ffcli.Command, usageFunc func(*ffcli.Command) string) {
 					},
 				},
 
+				// Subcommand which generates the shell completion arguments.
 				{
 					Name:      "__complete",
 					ShortHelp: "__complete provides autocomplete suggestions to interactive shells.",
+					UsageFunc: usageFunc,
 					Exec: func(ctx context.Context, args []string) error {
 						// Set up debug logging for the rest of this function call.
 						if t := os.Getenv("BASH_COMP_DEBUG_FILE"); t != "" {
