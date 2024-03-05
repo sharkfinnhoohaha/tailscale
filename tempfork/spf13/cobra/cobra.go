@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The content of this file has mostly been taken from the Cobra project
-// (https://cobra.dev, https://github.com/spf13/cobra).
-
-package ffcomplete
+// Package cobra contains shell scripts and constants copied from
+// https://github.com/spf13/cobra for use in our own shell tab-completion logic.
+package cobra
 
 import (
 	"fmt"
@@ -40,16 +39,12 @@ const (
 
 	// ShellCompDirectiveFilterFileExt indicates that the provided completions
 	// should be used as file extension filters.
-	// For flags, using Command.MarkFlagFilename() and Command.MarkPersistentFlagFilename()
-	// is a shortcut to using this directive explicitly.  The BashCompFilenameExt
-	// annotation can also be used to obtain the same behavior for flags.
 	ShellCompDirectiveFilterFileExt
 
 	// ShellCompDirectiveFilterDirs indicates that only directory names should
 	// be provided in file completion.  To request directory names within another
 	// directory, the returned completions should specify the directory within
-	// which to search.  The BashCompSubdirsInDir annotation can be used to
-	// obtain the same behavior but only for flags.
+	// which to search.
 	ShellCompDirectiveFilterDirs
 
 	// ShellCompDirectiveKeepOrder indicates that the shell should preserve the order
@@ -99,7 +94,7 @@ func (d ShellCompDirective) String() string {
 	return strings.Join(directives, " | ")
 }
 
-const usageTemplate = `To load completions:
+const UsageTemplate = `To load completions:
 
 Bash:
 
@@ -139,7 +134,7 @@ PowerShell:
 	# and source this file from your PowerShell profile.
 `
 
-const bashTemplate = `# bash completion V2 for %-36[1]s -*- shell-script -*-
+const BashTemplate = `# bash completion V2 for %-36[1]s -*- shell-script -*-
 
 __%[1]s_debug()
 {
@@ -479,7 +474,7 @@ fi
 # ex: ts=4 sw=4 et filetype=sh
 `
 
-const zshTemplate = `#compdef %[1]s
+const ZshTemplate = `#compdef %[1]s
 compdef _%[1]s %[1]s
 
 # zsh completion for %-36[1]s -*- shell-script -*-
@@ -693,7 +688,7 @@ if [ "$funcstack[1]" = "_%[1]s" ]; then
 fi
 `
 
-const fishTemplate = `# fish completion for %-36[1]s -*- shell-script -*-
+const FishTemplate = `# fish completion for %-36[1]s -*- shell-script -*-
 
 function __%[1]s_debug
     set -l file "$BASH_COMP_DEBUG_FILE"
@@ -930,7 +925,7 @@ complete -c %[2]s -n 'not __%[1]s_requires_order_preservation && __%[1]s_prepare
 complete -k -c %[2]s -n '__%[1]s_requires_order_preservation && __%[1]s_prepare_completions' -f -a '$__%[1]s_comp_results'
 `
 
-const powershellTemplate = `# powershell completion for %-36[1]s -*- shell-script -*-
+const PowershellTemplate = `# powershell completion for %-36[1]s -*- shell-script -*-
 
 function __%[1]s_debug {
     if ($env:BASH_COMP_DEBUG_FILE) {

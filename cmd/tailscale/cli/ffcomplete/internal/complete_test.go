@@ -1,4 +1,7 @@
-package ffcomplete_test
+// Copyright (c) Tailscale Inc & AUTHORS
+// SPDX-License-Identifier: BSD-3-Clause
+
+package internal_test
 
 import (
 	_ "embed"
@@ -9,6 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/peterbourgon/ff/v3/ffcli"
 	"tailscale.com/cmd/tailscale/cli/ffcomplete"
+	"tailscale.com/cmd/tailscale/cli/ffcomplete/internal"
 )
 
 func newFlagSet(name string, errh flag.ErrorHandling, flags func(fs *flag.FlagSet)) *flag.FlagSet {
@@ -41,16 +45,17 @@ func TestComplete(t *testing.T) {
 					ffcomplete.Flag(fs, "enum", ffcomplete.Fixed("alpha", "beta", "charlie"))
 				}),
 			},
-			ffcomplete.Args(
-				&ffcli.Command{
+			func() *ffcli.Command {
+				cmd := &ffcli.Command{
 					Name: "ping",
 					FlagSet: newFlagSet("prog ping", flag.ContinueOnError, func(fs *flag.FlagSet) {
 						fs.String("until", "", "when pinging should end")
 						ffcomplete.Flag(fs, "until", ffcomplete.Fixed("forever", "direct"))
 					}),
-				},
-				ffcomplete.Fixed("jupiter", "neptune", "venus"),
-			),
+				}
+				ffcomplete.Args(cmd, ffcomplete.Fixed("jupiter", "neptune", "venus"))
+				return cmd
+			}(),
 		},
 	}
 
@@ -162,7 +167,7 @@ func TestComplete(t *testing.T) {
 		test := test
 		t.Run(strings.Join(test.args, "␣"), func(t *testing.T) {
 			// Capture the binary
-			complete, dir, err := ffcomplete.Complete(root, test.args)
+			complete, dir, err := internal.Complete(root, test.args)
 			if err != nil {
 				t.Fatalf("completion error: %s", err)
 			}
