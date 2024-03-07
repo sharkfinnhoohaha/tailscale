@@ -167,6 +167,23 @@ change in the future.
 		return err
 	}
 
+	if envknob.Bool("TS_DUMP_HELP") {
+		walkCommands(rootCmd, func(c *ffcli.Command) {
+			fmt.Println("===")
+			// UsageFuncs are typically called during Command.Run which ensures
+			// FlagSet is not nil.
+			if c.FlagSet == nil {
+				c.FlagSet = flag.NewFlagSet(c.Name, flag.ContinueOnError)
+			}
+			if c.UsageFunc != nil {
+				fmt.Println(c.UsageFunc(c))
+			} else {
+				fmt.Println(ffcli.DefaultUsageFunc(c))
+			}
+		})
+		return
+	}
+
 	localClient.Socket = rootArgs.socket
 	rootfs.Visit(func(f *flag.Flag) {
 		if f.Name == "socket" {
@@ -198,6 +215,13 @@ var Fatalf func(format string, a ...any)
 
 var rootArgs struct {
 	socket string
+}
+
+func walkCommands(cmd *ffcli.Command, f func(*ffcli.Command)) {
+	f(cmd)
+	for _, sub := range cmd.Subcommands {
+		walkCommands(sub, f)
+	}
 }
 
 // usageFuncNoDefaultValues is like usageFunc but doesn't print default values.
