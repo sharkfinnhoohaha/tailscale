@@ -154,11 +154,11 @@ change in the future.
 		rootCmd.Subcommands = append(rootCmd.Subcommands, configureHostCmd)
 	}
 
-	for _, c := range rootCmd.Subcommands {
+	walkCommands(rootCmd, func(c *ffcli.Command) {
 		if c.UsageFunc == nil {
 			c.UsageFunc = usageFunc
 		}
-	}
+	})
 
 	if err := rootCmd.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
