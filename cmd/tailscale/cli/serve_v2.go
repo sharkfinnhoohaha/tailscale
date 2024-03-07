@@ -134,7 +134,7 @@ func newServeV2Command(e *serveEnv, subcmd serveMode) *ffcli.Command {
 				Name:       "status",
 				ShortUsage: "tailscale " + info.Name + " status [--json]",
 				Exec:       e.runServeStatus,
-				ShortHelp:  "view current proxy configuration",
+				ShortHelp:  "View current " + info.Name + " configuration",
 				FlagSet: e.newFlags("serve-status", func(fs *flag.FlagSet) {
 					fs.BoolVar(&e.json, "json", false, "output JSON")
 				}),
@@ -143,7 +143,7 @@ func newServeV2Command(e *serveEnv, subcmd serveMode) *ffcli.Command {
 			{
 				Name:       "reset",
 				ShortUsage: "tailscale " + info.Name + " reset",
-				ShortHelp:  "reset current serve/funnel config",
+				ShortHelp:  "Reset current " + info.Name + " config",
 				Exec:       e.runServeReset,
 				FlagSet:    e.newFlags("serve-reset", nil),
 				UsageFunc:  usageFunc,
