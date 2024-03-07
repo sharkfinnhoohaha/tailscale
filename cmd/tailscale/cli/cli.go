@@ -236,6 +236,10 @@ func usageFunc(c *ffcli.Command) string {
 func usageFuncOpt(c *ffcli.Command, withDefaults bool) string {
 	var b strings.Builder
 
+	if c.ShortHelp != "" {
+		fmt.Fprintf(&b, "%s\n\n", c.ShortHelp)
+	}
+
 	fmt.Fprintf(&b, "USAGE\n")
 	if c.ShortUsage != "" {
 		fmt.Fprintf(&b, "  %s\n", c.ShortUsage)
