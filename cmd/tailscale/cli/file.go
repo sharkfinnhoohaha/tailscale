@@ -420,7 +420,7 @@ var fileGetCmd = &ffcli.Command{
 		fs.BoolVar(&getArgs.wait, "wait", false, "wait for a file to arrive if inbox is empty")
 		fs.BoolVar(&getArgs.loop, "loop", false, "run get in a loop, receiving files as they come in")
 		fs.BoolVar(&getArgs.verbose, "verbose", false, "verbose output")
-		fs.Var(&getArgs.conflict, "conflict", `behavior when a conflicting (same-named) file already exists in the target directory.
+		fs.Var(&getArgs.conflict, "conflict", "`behavior`"+` when a conflicting (same-named) file already exists in the target directory.
 	skip:       skip conflicting files: leave them in the taildrop inbox and print an error. get any non-conflicting files
 	overwrite:  overwrite existing file
 	rename:     write to a new number-suffixed filename`)
