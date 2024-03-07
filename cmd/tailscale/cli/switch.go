@@ -17,8 +17,9 @@ import (
 )
 
 var switchCmd = &ffcli.Command{
-	Name:      "switch",
-	ShortHelp: "Switches to a different Tailscale account",
+	Name:       "switch",
+	ShortUsage: "tailscale switch <id>",
+	ShortHelp:  "Switches to a different Tailscale account",
 	FlagSet: func() *flag.FlagSet {
 		fs := flag.NewFlagSet("switch", flag.ExitOnError)
 		fs.BoolVar(&switchArgs.list, "list", false, "list available accounts")
