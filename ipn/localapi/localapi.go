@@ -135,6 +135,7 @@ var handler = map[string]localAPIHandler{
 	"update/check":                (*Handler).serveUpdateCheck,
 	"update/install":              (*Handler).serveUpdateInstall,
 	"update/progress":             (*Handler).serveUpdateProgress,
+	"suggest-exit-node":           (*Handler).serveSuggestExitNode,
 }
 
 var (
@@ -2679,3 +2680,24 @@ var (
 	// User-visible LocalAPI endpoints.
 	metricFilePutCalls = clientmetric.NewCounter("localapi_file_put")
 )
+
+// serveSuggestExitNode serves a POST endpoint for returning a suggested exit node.
+func (h *Handler) serveSuggestExitNode(w http.ResponseWriter, r *http.Request) {
+	if !h.PermitWrite {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return
+	}
+	if r.Method != "POST" {
+		http.Error(w, "want POST", http.StatusBadRequest)
+		return
+	}
+	suggestedExitNodeID, suggestedExitNodeName, err := h.b.SuggestExitNode()
+	if err != nil {
+		writeErrorJSON(w, err)
+		return
+	}
+	var res apitype.ExitNodeSuggestionResponse
+	res.SuggestedExitNodeID = suggestedExitNodeID
+	res.SuggestExitNodeName = suggestedExitNodeName
+	json.NewEncoder(w).Encode(res)
+}

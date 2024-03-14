@@ -49,3 +49,8 @@ type ReloadConfigResponse struct {
 	Reloaded bool   // whether the config was reloaded
 	Err      string // any error message
 }
+
+type ExitNodeSuggestionResponse struct {
+	SuggestedExitNodeID tailcfg.StableNodeID
+	SuggestExitNodeName string
+}
