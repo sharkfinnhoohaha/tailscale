@@ -115,7 +115,7 @@ func runExitNodeList(ctx context.Context, args []string) error {
 // runExitNodeSuggest returns a suggested exit node ID to connect to and shows the chosen exit node tailcfg.StableNodeID.
 // If there are no derp based exit nodes to choose from or there is a failure in finding a suggestion, the command will return an error indicating so.
 func runExitNodeSuggest(ctx context.Context, args []string) error {
-	suggestedNodeID, suggestedNodeName, err := localClient.SuggestExitNode(ctx)
+	suggestedNodeID, suggestedNodeName, _, err := localClient.SuggestExitNode(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to suggest exit node. Error: %v", err)
 	}

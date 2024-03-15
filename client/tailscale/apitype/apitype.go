@@ -51,6 +51,7 @@ type ReloadConfigResponse struct {
 }
 
 type ExitNodeSuggestionResponse struct {
-	SuggestedExitNodeID tailcfg.StableNodeID
-	SuggestExitNodeName string
+	SuggestedExitNodeID       tailcfg.StableNodeID
+	SuggestedExitNodeName     string
+	SuggestedExitNodeLocation tailcfg.Location
 }

@@ -2512,12 +2512,13 @@ func TestValidPopBrowserURL(t *testing.T) {
 
 func TestSuggestExitNode(t *testing.T) {
 	tests := []struct {
-		name       string
-		lastReport netcheck.Report
-		netMap     netmap.NetworkMap
-		wantID     tailcfg.StableNodeID
-		wantName   string
-		wantError  error
+		name         string
+		lastReport   netcheck.Report
+		netMap       netmap.NetworkMap
+		wantID       tailcfg.StableNodeID
+		wantName     string
+		wantLocation tailcfg.Location
+		wantError    error
 	}{
 		{
 			name: "2 exit nodes in same region",
@@ -2673,7 +2674,11 @@ func TestSuggestExitNode(t *testing.T) {
 					}).View(),
 				},
 			},
-			wantID:   tailcfg.StableNodeID("2"),
+			wantID: tailcfg.StableNodeID("2"),
+			wantLocation: tailcfg.Location{
+				Latitude:  32.89748,
+				Longitude: -97.040443,
+			},
 			wantName: "Dallas",
 		},
 		{
@@ -2803,9 +2808,9 @@ func TestSuggestExitNode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotID, gotName, err := suggestExitNode(&tt.lastReport, &tt.netMap)
-			if gotName != tt.wantName || gotID != tt.wantID || err != tt.wantError {
-				t.Errorf("got name %v id %v error %v want name %v id %v error %v", gotName, gotID, err, tt.wantName, tt.wantID, tt.wantError)
+			gotID, gotName, gotLocation, err := suggestExitNode(&tt.lastReport, &tt.netMap)
+			if gotName != tt.wantName || gotID != tt.wantID || err != tt.wantError || gotLocation != tt.wantLocation {
+				t.Errorf("got name %v id %v location %v error %v want name %v id %v location %v error %v", gotName, gotID, gotLocation, err, tt.wantName, tt.wantID, tt.wantLocation, tt.wantError)
 			}
 		})
 	}
