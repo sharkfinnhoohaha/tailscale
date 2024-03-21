@@ -86,6 +86,7 @@ import (
 	"tailscale.com/types/views"
 	"tailscale.com/util/deephash"
 	"tailscale.com/util/dnsname"
+	"tailscale.com/util/httpm"
 	"tailscale.com/util/mak"
 	"tailscale.com/util/multierr"
 	"tailscale.com/util/osshare"
@@ -4729,7 +4730,34 @@ type tailFSTransport struct {
 	b *LocalBackend
 }
 
-func (t *tailFSTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *tailFSTransport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	bw := &requestBodyWrapper{}
+	if req.Body != nil {
+		bw.ReadCloser = req.Body
+		req.Body = bw
+	}
+
+	defer func() {
+		if req.Method != httpm.PUT && req.Method != httpm.GET {
+			return
+		}
+
+		i := strings.LastIndex(req.URL.String(), ".")
+		fileType := "unknown"
+		if i >= 0 && i < len(req.URL.String())-1 {
+			fileType = req.URL.String()[i+1:]
+		}
+		t.b.mu.Lock()
+		selfNodeKey := t.b.netMap.SelfNode.Key().ShortString()
+		t.b.mu.Unlock()
+		n, _, ok := t.b.WhoIs(netip.MustParseAddrPort(req.URL.Host))
+		shareNodeKey := "unknown"
+		if ok {
+			shareNodeKey = string(n.Key().ShortString())
+		}
+		t.b.logf(fmt.Sprintf("tailfs: access: %s from %s to %s: status code=%v type=%s tx=%d rx=%d", req.Method, selfNodeKey, shareNodeKey, resp.StatusCode, fileType, bw.bytesRead, resp.ContentLength))
+	}()
+
 	// dialTimeout is fairly aggressive to avoid hangs on contacting offline or
 	// unreachable hosts.
 	dialTimeout := 1 * time.Second // TODO(oxtoacart): tune this

@@ -42,6 +42,7 @@ import (
 	"tailscale.com/types/views"
 	"tailscale.com/util/clientmetric"
 	"tailscale.com/util/httphdr"
+	"tailscale.com/util/httpm"
 	"tailscale.com/wgengine/filter"
 )
 
@@ -1104,8 +1105,44 @@ func writePrettyDNSReply(w io.Writer, res []byte) (err error) {
 	return nil
 }
 
+// httpResponseWrapper wraps an http.ResponseWrite and
+// stores the status code and content length.
+type httpResponseWrapper struct {
+	http.ResponseWriter
+	statusCode    int
+	contentLength int
+}
+
+// WriteHeader implements the WriteHeader interface.
+func (hrw *httpResponseWrapper) WriteHeader(status int) {
+	hrw.statusCode = status
+	hrw.ResponseWriter.WriteHeader(status)
+}
+
+// Write implements the Write interface.
+func (hrw *httpResponseWrapper) Write(b []byte) (int, error) {
+	n, err := hrw.ResponseWriter.Write(b)
+	hrw.contentLength += n
+	return n, err
+}
+
+// requestBodyWrapper wraps an io.ReadCloser and stores
+// the number of bytesRead.
+type requestBodyWrapper struct {
+	io.ReadCloser
+	bytesRead int
+}
+
+// Read implements the io.Reader interface.
+func (rbw *requestBodyWrapper) Read(b []byte) (int, error) {
+	n, err := rbw.ReadCloser.Read(b)
+	rbw.bytesRead += n
+	return n, err
+}
+
 func (h *peerAPIHandler) handleServeTailFS(w http.ResponseWriter, r *http.Request) {
 	if !h.ps.b.TailFSSharingEnabled() {
+		h.logf("tailfs: not enabled")
 		http.Error(w, "tailfs not enabled", http.StatusNotFound)
 		return
 	}
@@ -1113,6 +1150,7 @@ func (h *peerAPIHandler) handleServeTailFS(w http.ResponseWriter, r *http.Reques
 	capsMap := h.peerCaps()
 	tailfsCaps, ok := capsMap[tailcfg.PeerCapabilityTailFS]
 	if !ok {
+		h.logf("tailfs: not permitted")
 		http.Error(w, "tailfs not permitted", http.StatusForbidden)
 		return
 	}
@@ -1124,17 +1162,47 @@ func (h *peerAPIHandler) handleServeTailFS(w http.ResponseWriter, r *http.Reques
 
 	p, err := tailfs.ParsePermissions(rawPerms)
 	if err != nil {
+		h.logf("tailfs: error parsing permissions: %w", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	fs, ok := h.ps.b.sys.TailFSForRemote.GetOK()
 	if !ok {
-		http.Error(w, "tailfs not enabled", http.StatusNotFound)
+		h.logf("tailfs: not supported on platform")
+		http.Error(w, "tailfs not supported on platform", http.StatusNotFound)
 		return
 	}
+	wr := &httpResponseWrapper{
+		ResponseWriter: w,
+	}
+	bw := &requestBodyWrapper{
+		ReadCloser: r.Body,
+	}
+	r.Body = bw
+
+	defer func() {
+		if r.Method != httpm.PUT && r.Method != httpm.GET {
+			return
+		}
+
+		switch wr.statusCode {
+		case 304:
+			// 304s are particularly chatty so skip logging.
+		default:
+			i := strings.LastIndex(r.URL.String(), ".")
+			fileType := "unknown"
+			if i >= 0 && i < len(r.URL.String())-1 {
+				fileType = r.URL.String()[i+1:]
+			}
+			if len(fileType) > 0 {
+				h.logf(fmt.Sprintf("tailfs: share: %s from %s to %s: status code=%v type=%s tx=%d rx=%d", r.Method, h.peerNode.Key().ShortString(), h.selfNode.Key().ShortString(), wr.statusCode, fileType, wr.contentLength, bw.bytesRead))
+			}
+		}
+	}()
+
 	r.URL.Path = strings.TrimPrefix(r.URL.Path, tailFSPrefix)
-	fs.ServeHTTPWithPerms(p, w, r)
+	fs.ServeHTTPWithPerms(p, wr, r)
 }
 
 // newFakePeerAPIListener creates a new net.Listener that acts like
